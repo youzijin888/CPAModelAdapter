@@ -1,6 +1,11 @@
 import json
+import contextlib
+import io
 import os
 import pathlib
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -32,6 +37,91 @@ def template(slug=None):
 
 
 class CPAModelAdapterTests(unittest.TestCase):
+    def test_bundled_parser_handles_toml(self):
+        from _vendor import tomli
+
+        parsed = tomli.loads('''# preserved config syntax
+model_provider = "example-cpa"
+limits = [1, 2, 3]
+[model_providers."example-cpa"]
+base_url = "https://example.test/v1"
+env_key = "EXAMPLE_API_KEY"
+''')
+        self.assertEqual(parsed["limits"], [1, 2, 3])
+        self.assertEqual(parsed["model_providers"]["example-cpa"]["env_key"], "EXAMPLE_API_KEY")
+        with self.assertRaises(tomli.TOMLDecodeError):
+            tomli.loads('broken = [')
+
+    def test_install_preserves_config_in_directory_with_spaces(self):
+        with tempfile.TemporaryDirectory(prefix="CPA test with spaces ") as directory:
+            config_path = pathlib.Path(directory) / "config.toml"
+            output_dir = pathlib.Path(directory) / "model files"
+            original = '''model = "example-model"
+model_provider = "example-cpa"
+[model_providers.example-cpa]
+base_url = "https://example.test/v1"
+env_key = "EXAMPLE_API_KEY"
+[mcp_servers.example]
+command = "keep-this-command"
+'''
+            config_path.write_text(original, encoding="utf-8")
+            arguments = cpa_model_adapter.build_parser().parse_args([
+                "install", "--codex-config", str(config_path), "--output-dir", str(output_dir)
+            ])
+            source = {"fallback_model": template(), "models": [template("example-model")]}
+            with mock.patch.dict(os.environ, {"EXAMPLE_API_KEY": "private-test-key"}), \
+                 mock.patch.object(cpa_model_adapter, "request_json", return_value={"data": [{"id": "example-model"}]}), \
+                 mock.patch.object(cpa_model_adapter, "fetch_template_catalog", return_value=source), \
+                 contextlib.redirect_stdout(io.StringIO()) as output:
+                arguments.handler(arguments)
+            updated = config_path.read_text(encoding="utf-8")
+            setting = cpa_model_adapter.render_config(output_dir / "models.json")
+            self.assertEqual(updated.replace(setting, ""), original)
+            self.assertEqual(len(list(config_path.parent.glob("config.toml.backup-*"))), 1)
+            self.assertTrue((output_dir / "models.json").is_file())
+            self.assertNotIn("private-test-key", output.getvalue())
+
+    def test_missing_stdlib_uses_bundled_parser(self):
+        program = '''import sys, unittest
+sys.modules["tomllib"] = None
+import cpa_model_adapter
+assert cpa_model_adapter.tomllib.__name__ == "_vendor.tomli"
+tests = unittest.defaultTestLoader.loadTestsFromNames([
+    "test_cpa_model_adapter.CPAModelAdapterTests.test_install_preserves_config_in_directory_with_spaces",
+    "test_cpa_model_adapter.CPAModelAdapterTests.test_merge_updates_only_existing_catalog_setting",
+    "test_cpa_model_adapter.CPAModelAdapterTests.test_bundled_parser_handles_toml",
+])
+result = unittest.TextTestRunner().run(tests)
+sys.exit(0 if result.wasSuccessful() else 1)
+'''
+        result = subprocess.run(
+            [sys.executable, "-S", "-c", program], capture_output=True, text=True,
+            cwd=pathlib.Path(__file__).resolve().parent, timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_launcher_without_stdlib_in_path_with_spaces(self):
+        source = pathlib.Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory(prefix="CPA launcher with spaces ") as directory:
+            destination = pathlib.Path(directory) / "CPAModelAdapter project"
+            destination.mkdir()
+            for filename in ("CPAModelAdapter", "cpa_model_adapter.py"):
+                shutil.copy2(source / filename, destination / filename)
+            shutil.copytree(source / "_vendor", destination / "_vendor")
+            program = '''import pathlib, runpy, sys
+sys.modules["tomllib"] = None
+entrypoint = sys.argv[1]
+sys.path.insert(0, str(pathlib.Path(entrypoint).parent))
+sys.argv = [entrypoint, "--help"]
+runpy.run_path(entrypoint, run_name="__main__")
+'''
+            result = subprocess.run(
+                [sys.executable, "-S", "-c", program, str(destination / "CPAModelAdapter")],
+                cwd=directory, capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("usage: CPAModelAdapter", result.stdout)
+
     def test_default_output_is_relative_to_program(self):
         self.assertEqual(
             pathlib.Path(cpa_model_adapter.DEFAULT_OUTPUT_DIR),

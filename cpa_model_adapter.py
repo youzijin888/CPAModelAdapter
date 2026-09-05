@@ -12,11 +12,15 @@ import os
 import pathlib
 import re
 import sys
-import tomllib
 import urllib.error
 import urllib.request
 import urllib.parse
 from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    from _vendor import tomli as tomllib
 
 
 DEFAULT_OUTPUT_DIR = str(pathlib.Path(__file__).resolve().parent / "generated")

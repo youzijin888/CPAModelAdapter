@@ -15,7 +15,8 @@ CPA 模型适配器：读取用户已经配置好的 CPA（CLIProxyAPI 或兼容
 
 ## 环境要求
 
-- Python 3.11 或更新版本；仅使用 Python 标准库，无需安装额外依赖。
+- Python 3.8 或更新版本；无需 `pip install` 或手动安装依赖。
+- Python 3.11+ 使用内置 `tomllib`；Python 3.8–3.10 自动使用随仓库附带的 Tomli 解析器。
 - 已配置的自定义 Provider，包含 `base_url` 和 `env_key`。
 - 在运行适配器的终端中，`env_key` 指定的变量必须已存在。
 - CPA 提供兼容的 `/v1/models` 接口。
@@ -44,6 +45,19 @@ python3 cpa_model_adapter.py validate
 ```bash
 ./CPAModelAdapter install
 ```
+
+### 从旧版更新（包括 Mac 的 `No module named 'tomllib'` 报错）
+
+在克隆的项目目录执行：
+
+```bash
+git pull --ff-only
+./CPAModelAdapter generate
+```
+
+如果是下载 ZIP 的方式安装，请重新下载并解压整个仓库，不要只替换单个脚本。
+需要保留 `_vendor/` 目录。兼容解析器已随程序附带，无需升级系统 Python。
+项目路径可以包含空格。联网读取 CPA 和模型模板的要求不变。
 
 安装修改的是现有配置中的这一项，不是用生成文件替换整个配置：
 
@@ -116,3 +130,5 @@ python3 -m unittest -v
 ```
 
 单元测试不访问真实 CPA、不需要真实密钥，也不写入用户 Codex 配置。
+
+附带解析器的来源与许可证见 `THIRD_PARTY_NOTICES.md`。
