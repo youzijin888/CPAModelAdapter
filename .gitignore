@@ -1,0 +1,14 @@
+generated/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.env
+auth.json
+config.toml
+config.yaml
+management-key
+*.backup-*
+*.log
+.venv/
+.DS_Store
