@@ -41,6 +41,9 @@ ALLOWED_REASONING_LEVELS = (
     "max",
     "ultra",
 )
+BUNDLED_REASONING_LEVELS = {
+    "gpt-6-astra": ("low", "medium", "high", "xhigh", "max"),
+}
 REASONING_DESCRIPTIONS = {
     "none": "No reasoning",
     "minimal": "Minimal reasoning",
@@ -267,7 +270,10 @@ def validate_model_entry(model: dict[str, Any], require_slug: bool = True) -> No
         raise SyncError("experimental_supported_tools must be an array")
 
 
-def reasoning_levels(definition: dict[str, Any], template: dict[str, Any]) -> list[str]:
+def reasoning_levels(
+    definition: dict[str, Any], template: dict[str, Any], model_id: str,
+    *, exact_template: bool,
+) -> list[str]:
     thinking = definition.get("thinking")
     raw = thinking.get("levels") if isinstance(thinking, dict) else None
     levels = [
@@ -282,6 +288,8 @@ def reasoning_levels(definition: dict[str, Any], template: dict[str, Any]) -> li
             if isinstance(item, dict)
             and str(item.get("effort", "")).casefold() in ALLOWED_REASONING_LEVELS
         ]
+        if not exact_template or not levels:
+            levels = list(BUNDLED_REASONING_LEVELS.get(model_id.casefold(), levels))
     return list(dict.fromkeys(levels)) or ["medium"]
 
 
@@ -326,7 +334,7 @@ def build_model_entry(
             model["input_modalities"] = normalized
             model["supports_image_detail_original"] = "image" in normalized
 
-    levels = reasoning_levels(definition, model)
+    levels = reasoning_levels(definition, model, model_id, exact_template=known)
     model["supported_reasoning_levels"] = [
         {"effort": level, "description": REASONING_DESCRIPTIONS[level]} for level in levels
     ]

@@ -221,6 +221,54 @@ env_key = "EXISTING_CPA_KEY"
         )
         self.assertEqual(skipped, [])
 
+    def test_astra_has_bundled_efforts_without_api_metadata(self):
+        for fallback_efforts in ([], [{"effort": "medium", "description": "Medium"}]):
+            with self.subTest(fallback_efforts=fallback_efforts):
+                fallback = template()
+                fallback["supported_reasoning_levels"] = fallback_efforts
+                catalog, skipped = cpa_model_adapter.prepare_catalog(
+                    ["gpt-6-astra"], {"gpt-6-astra": {"id": "gpt-6-astra"}},
+                    {"fallback_model": fallback, "models": [template("known-model")]},
+                    cpa_model_adapter.DEFAULT_EXCLUDES,
+                )
+                model = catalog["models"][0]
+                self.assertEqual(
+                    [entry["effort"] for entry in model["supported_reasoning_levels"]],
+                    ["low", "medium", "high", "xhigh", "max"],
+                )
+                self.assertEqual(model["default_reasoning_level"], "medium")
+                self.assertEqual(skipped, [])
+
+    def test_astra_live_efforts_override_bundled_efforts(self):
+        model = cpa_model_adapter.build_model_entry(
+            "gpt-6-astra", {"thinking": {"levels": ["low", "high"]}}, {}, template(), 1
+        )
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            ["low", "high"],
+        )
+
+    def test_astra_exact_template_overrides_bundled_efforts(self):
+        model = cpa_model_adapter.build_model_entry(
+            "gpt-6-astra", {}, {"gpt-6-astra": template("gpt-6-astra")}, template(), 1
+        )
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]], ["medium"]
+        )
+
+    def test_bundled_efforts_only_apply_to_exact_model_id(self):
+        model = cpa_model_adapter.build_model_entry("gpt-6-astra-custom", {}, {}, template(), 1)
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]], ["medium"]
+        )
+
+    def test_astra_bundled_efforts_ignore_model_id_case(self):
+        model = cpa_model_adapter.build_model_entry("GPT-6-ASTRA", {}, {}, template(), 1)
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            ["low", "medium", "high", "xhigh", "max"],
+        )
+
     def test_generated_config_contains_only_catalog_path(self):
         with tempfile.TemporaryDirectory() as directory:
             catalog_path = pathlib.Path(directory) / "models.json"
