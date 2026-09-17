@@ -42,6 +42,7 @@ ALLOWED_REASONING_LEVELS = (
     "ultra",
 )
 BUNDLED_REASONING_LEVELS = {
+    "deepseek-flash": ALLOWED_REASONING_LEVELS,
     "gpt-6-astra": ("low", "medium", "high", "xhigh", "max"),
 }
 REASONING_DESCRIPTIONS = {
@@ -294,7 +295,11 @@ def reasoning_levels(
 
 
 def default_reasoning(model_id: str, levels: list[str]) -> str:
-    preferred = "low" if model_id.casefold() == "gpt-5.6-sol" else "medium"
+    preferred_by_model = {
+        "deepseek-flash": "high",
+        "gpt-5.6-sol": "low",
+    }
+    preferred = preferred_by_model.get(model_id.casefold(), "medium")
     if preferred in levels:
         return preferred
     return levels[0]

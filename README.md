@@ -106,8 +106,19 @@ model_catalog_json = "/absolute/path/to/CPAModelAdapter/generated/models.json"
 推理档位的优先级：CPA 响应中的有效 `thinking.levels` → 精确模型模板 →
 内置补充信息 → 通用回退模板。均缺失时才默认 `medium`。
 
-当前内置补充信息包含 `gpt-6-astra` 的 `low / medium / high / xhigh / max`，
-依据是 2026-09-05 核对的 CPA `model-definitions/codex` 模型定义。
+当前内置补充信息包含：
+
+- `deepseek-flash`：声明 Codex 当前可发送的完整档位
+  `none / minimal / low / medium / high / xhigh / max / ultra`，默认 `high`。
+  适配器不转换档位；CPA 根据 DeepSeek 的兼容规则自动映射到实际推理强度。
+  `auto` 不是 Codex 推理档位，不会写入目录。该模型支持对话中的文字和图片输入，
+  不支持图片生成/编辑端点。这是在当前 CPA `/v1/models` 未返回思考元数据时使用的
+  兼容性回退，依据
+  [DeepSeek Chat Completions API](https://api-docs.deepseek.com/api/create-chat-completion/)
+  与已确认的 CPA 参数说明。
+- `gpt-6-astra`：`low / medium / high / xhigh / max`，依据是 2026-09-05
+  核对的 CPA `model-definitions/codex` 模型定义。
+
 它只在实时响应、精确模板未提供档位时使用，仅匹配完整模型名称，不套用到其它别名。
 这只补充模型目录的 `supported_reasoning_levels`；不会修改全局 `model_reasoning_effort`。
 本工具运行时不调用管理接口、不需要管理密钥，也不需要开启远程管理。

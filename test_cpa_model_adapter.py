@@ -239,6 +239,34 @@ env_key = "EXISTING_CPA_KEY"
                 self.assertEqual(model["default_reasoning_level"], "medium")
                 self.assertEqual(skipped, [])
 
+    def test_deepseek_has_bundled_efforts_without_api_metadata(self):
+        for fallback_efforts in ([], [{"effort": "medium", "description": "Medium"}]):
+            with self.subTest(fallback_efforts=fallback_efforts):
+                fallback = template()
+                fallback["supported_reasoning_levels"] = fallback_efforts
+                catalog, skipped = cpa_model_adapter.prepare_catalog(
+                    ["deepseek-flash"], {"deepseek-flash": {"id": "deepseek-flash"}},
+                    {"fallback_model": fallback, "models": [template("known-model")]},
+                    cpa_model_adapter.DEFAULT_EXCLUDES,
+                )
+                model = catalog["models"][0]
+                self.assertEqual(
+                    [entry["effort"] for entry in model["supported_reasoning_levels"]],
+                    ["none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"],
+                )
+                self.assertEqual(model["default_reasoning_level"], "high")
+                self.assertEqual(skipped, [])
+
+    def test_deepseek_live_efforts_override_bundled_efforts(self):
+        model = cpa_model_adapter.build_model_entry(
+            "deepseek-flash", {"thinking": {"levels": ["low", "high"]}}, {}, template(), 1
+        )
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            ["low", "high"],
+        )
+        self.assertEqual(model["default_reasoning_level"], "high")
+
     def test_astra_live_efforts_override_bundled_efforts(self):
         model = cpa_model_adapter.build_model_entry(
             "gpt-6-astra", {"thinking": {"levels": ["low", "high"]}}, {}, template(), 1
@@ -300,8 +328,7 @@ custom_setting = true
 '''
         generated = cpa_model_adapter.render_config(pathlib.Path("/tmp/models.json"))
         merged = cpa_model_adapter.merge_codex_config(existing, generated)
-        catalog_line = 'model_catalog_json = "/tmp/models.json"\n'
-        self.assertEqual(merged.replace(catalog_line, ""), existing)
+        self.assertEqual(merged.replace(generated, ""), existing)
         self.assertIn('model = "old-model"', merged)
         self.assertIn('model_provider = "old-provider"', merged)
         self.assertIn('base_url = "http://old.invalid/v1"', merged)
@@ -320,7 +347,7 @@ env_key = "EXISTING_KEY"
         merged = cpa_model_adapter.merge_codex_config(existing, generated)
         expected = existing.replace(
             'model_catalog_json = "/old/models.json"',
-            'model_catalog_json = "/tmp/models.json"',
+            generated.strip(),
         )
         self.assertEqual(merged, expected)
 
