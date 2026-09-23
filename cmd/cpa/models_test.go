@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -130,6 +131,60 @@ func TestCatalogFilteringAndEfforts(t *testing.T) {
 	if len(efforts(c.Models[2])) != 2 {
 		t.Fatal("effort dedup")
 	}
+}
+
+func TestUnknownModelsWithoutThinkingGetAllCodexEfforts(t *testing.T) {
+	for _, id := range []string{"gpt-6-sol", "gpt-6-luna", "future-model"} {
+		t.Run(id, func(t *testing.T) {
+			catalog, _, err := buildCatalog([]map[string]any{{"slug": id}}, fixture())
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := catalog.Models[0]
+			if got := efforts(model); !reflect.DeepEqual(got, allEfforts) {
+				t.Fatalf("efforts = %v, want %v", got, allEfforts)
+			}
+			if str(model["default_reasoning_level"]) != "medium" {
+				t.Fatal("unknown model default effort must be medium")
+			}
+		})
+	}
+}
+
+func TestReasoningPriorityAndDeepSeekCompatibility(t *testing.T) {
+	t.Run("live metadata wins", func(t *testing.T) {
+		catalog, _, err := buildCatalog([]map[string]any{{"slug": "future-model", "thinking": map[string]any{"levels": []any{"low", "max"}}}}, fixture())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := efforts(catalog.Models[0]); !reflect.DeepEqual(got, []string{"low", "max"}) {
+			t.Fatalf("live efforts = %v", got)
+		}
+	})
+
+	t.Run("exact template wins", func(t *testing.T) {
+		catalog, _, err := buildCatalog([]map[string]any{{"slug": "known"}}, fixture())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := efforts(catalog.Models[0]); !reflect.DeepEqual(got, []string{"medium", "high"}) {
+			t.Fatalf("template efforts = %v", got)
+		}
+	})
+
+	t.Run("deepseek fallback", func(t *testing.T) {
+		catalog, _, err := buildCatalog([]map[string]any{{"slug": "deepseek-flash"}}, fixture())
+		if err != nil {
+			t.Fatal(err)
+		}
+		model := catalog.Models[0]
+		if got := efforts(model); !reflect.DeepEqual(got, allEfforts) {
+			t.Fatalf("DeepSeek efforts = %v", got)
+		}
+		if str(model["default_reasoning_level"]) != "high" {
+			t.Fatal("DeepSeek default effort must be high")
+		}
+	})
 }
 
 func TestNormalizeURL(t *testing.T) {

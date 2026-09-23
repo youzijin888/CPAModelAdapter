@@ -174,6 +174,14 @@ wire_api = "responses"
 兼容旧版 `fallback_model + models` 和新版仅 `models` 的模板结构；自动补齐从
 `model_messages.instructions_template` 迁移的指令字段，保留原始 `model_messages`。
 没有明确模板的未知模型使用自有保守回退（缺少实际元数据时上下文默认 32768），不继承其他模型的高级工具策略。
+
+推理档位按以下优先级生成：供应商 `/models` 返回的有效 `thinking.levels`、精确模型模板、
+特定模型补充、Codex 完整档位 `none / minimal / low / medium / high / xhigh / max / ultra`。
+因此没有精确模板的新版模型仍会显示完整思考档位，默认使用 `medium`。
+`deepseek-flash` 在缺少思考元数据时同样使用完整档位，默认使用 `high`；
+`gpt-6-astra` 的兼容补充为 `low / medium / high / xhigh / max`。
+完整档位是客户端兼容声明，实际接受或映射哪些强度仍由 CPA 和上游决定。
+
 精确模板里的 Fast 等字段会保留；未知模型不会凭空宣称 Fast/WebSocket/搜索能力。
 目录包含某个字段不等于当前 Codex 前端一定显示相应开关。
 默认不下载模板，也不依赖旧的 `template-cache.json`。

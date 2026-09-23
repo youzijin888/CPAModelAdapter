@@ -24,6 +24,7 @@ const maxJSON = 8 << 20
 var bundledModels []byte
 
 var requiredFields = []string{"slug", "display_name", "base_instructions", "context_window", "max_context_window", "supported_reasoning_levels", "shell_type", "visibility", "supported_in_api", "default_reasoning_summary", "support_verbosity", "truncation_policy", "supports_parallel_tool_calls", "experimental_supported_tools", "priority"}
+var allEfforts = []string{"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
 var allowedEfforts = map[string]bool{"none": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true, "ultra": true}
 
 type Catalog struct {
@@ -355,14 +356,18 @@ func buildCatalog(defs []map[string]any, t Templates) (Catalog, int, error) {
 				levels = append(levels, s)
 			}
 		}
-		if len(levels) == 0 {
+		if len(levels) == 0 && exact {
 			levels = efforts(base)
-			if (!exact || len(levels) == 0) && strings.EqualFold(id, "gpt-6-astra") {
-				levels = []string{"low", "medium", "high", "xhigh", "max"}
-			}
 		}
 		if len(levels) == 0 {
-			levels = []string{"medium"}
+			switch {
+			case strings.EqualFold(id, "gpt-6-astra"):
+				levels = []string{"low", "medium", "high", "xhigh", "max"}
+			case strings.EqualFold(id, "deepseek-flash"):
+				levels = append([]string(nil), allEfforts...)
+			default:
+				levels = append([]string(nil), allEfforts...)
+			}
 		}
 		entries := []any{}
 		for _, s := range levels {
@@ -370,7 +375,9 @@ func buildCatalog(defs []map[string]any, t Templates) (Catalog, int, error) {
 		}
 		m["supported_reasoning_levels"] = entries
 		pref := "medium"
-		if strings.EqualFold(id, "gpt-5.6-sol") {
+		if strings.EqualFold(id, "deepseek-flash") {
+			pref = "high"
+		} else if strings.EqualFold(id, "gpt-5.6-sol") {
 			pref = "low"
 		}
 		if !includes(levels, pref) {
