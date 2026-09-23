@@ -99,12 +99,13 @@ model_catalog_json = "/absolute/path/to/CPAModelAdapter/generated/models.json"
 
 1. 从用户现有 Provider 查询模型列表。
 2. 对已知模型使用精确名称匹配的模板，并采用响应中可读取的元数据。
-3. 缺少精确模板时，使用已确认的内置推理档位补充信息，其余字段继续使用回退模板。
+3. 缺少精确模板时，优先使用已确认的内置推理档位；其它未知模型默认声明 Codex 完整档位，其余字段继续使用回退模板。
 4. 过滤图像、音频、嵌入等非目标模型，以及 `codex-auto-review`。
 5. 校验目录必要字段，再逐文件原子写入。
 
 推理档位的优先级：CPA 响应中的有效 `thinking.levels` → 精确模型模板 →
-内置补充信息 → 通用回退模板。均缺失时才默认 `medium`。
+内置补充信息 → Codex 完整档位 `none / minimal / low / medium / high / xhigh / max / ultra`。
+最后一种情况的默认档位为 `medium`；通用回退模板中的单一档位不限制未知模型。
 
 当前内置补充信息包含：
 
@@ -119,11 +120,13 @@ model_catalog_json = "/absolute/path/to/CPAModelAdapter/generated/models.json"
 - `gpt-6-astra`：`low / medium / high / xhigh / max`，依据是 2026-09-05
   核对的 CPA `model-definitions/codex` 模型定义。
 
-它只在实时响应、精确模板未提供档位时使用，仅匹配完整模型名称，不套用到其它别名。
+内置补充信息只在实时响应、精确模板未提供档位时使用，仅匹配完整模型名称，
+不套用到其它别名；其它未知模型采用完整档位回退。
 这只补充模型目录的 `supported_reasoning_levels`；不会修改全局 `model_reasoning_effort`。
 本工具运行时不调用管理接口、不需要管理密钥，也不需要开启远程管理。
 
-内置补充不是对所有供应商实际能力的保证；未知模型的其它回退元数据仍需核实。
+完整档位回退只是目录兼容性声明，不保证 CPA 或上游实际支持全部档位；
+具体转换或拒绝行为由 CPA 和上游决定，未知模型的其它回退元数据仍需核实。
 如果之前的 Astra 只有 `medium`，更新程序后重新执行 `generate` 或 `install` 即可重建文件；
 当前 Codex 运行时仍需加载更新后的目录。
 

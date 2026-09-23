@@ -221,6 +221,37 @@ env_key = "EXISTING_CPA_KEY"
         )
         self.assertEqual(skipped, [])
 
+    def test_unknown_models_without_efforts_get_all_codex_levels(self):
+        for model_id in ("gpt-6-sol", "gpt-6-luna", "future-model"):
+            with self.subTest(model_id=model_id):
+                model = cpa_model_adapter.build_model_entry(
+                    model_id, {}, {}, template(), 1
+                )
+                self.assertEqual(
+                    [entry["effort"] for entry in model["supported_reasoning_levels"]],
+                    list(cpa_model_adapter.ALLOWED_REASONING_LEVELS),
+                )
+                self.assertEqual(model["default_reasoning_level"], "medium")
+
+    def test_unknown_model_live_efforts_override_full_fallback(self):
+        model = cpa_model_adapter.build_model_entry(
+            "future-model", {"thinking": {"levels": ["low", "max"]}},
+            {}, template(), 1,
+        )
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            ["low", "max"],
+        )
+
+    def test_exact_template_efforts_override_full_fallback(self):
+        model = cpa_model_adapter.build_model_entry(
+            "known-model", {}, {"known-model": template("known-model")}, template(), 1
+        )
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            ["medium"],
+        )
+
     def test_astra_has_bundled_efforts_without_api_metadata(self):
         for fallback_efforts in ([], [{"effort": "medium", "description": "Medium"}]):
             with self.subTest(fallback_efforts=fallback_efforts):
@@ -284,10 +315,11 @@ env_key = "EXISTING_CPA_KEY"
             [entry["effort"] for entry in model["supported_reasoning_levels"]], ["medium"]
         )
 
-    def test_bundled_efforts_only_apply_to_exact_model_id(self):
+    def test_unrecognized_variant_uses_full_fallback(self):
         model = cpa_model_adapter.build_model_entry("gpt-6-astra-custom", {}, {}, template(), 1)
         self.assertEqual(
-            [entry["effort"] for entry in model["supported_reasoning_levels"]], ["medium"]
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            list(cpa_model_adapter.ALLOWED_REASONING_LEVELS),
         )
 
     def test_astra_bundled_efforts_ignore_model_id_case(self):

@@ -282,16 +282,18 @@ def reasoning_levels(
         for level in raw or []
         if str(level).casefold() in ALLOWED_REASONING_LEVELS
     ]
-    if not levels:
+    if levels:
+        return list(dict.fromkeys(levels))
+    if exact_template:
         levels = [
             str(item.get("effort", "")).casefold()
             for item in template.get("supported_reasoning_levels", [])
             if isinstance(item, dict)
             and str(item.get("effort", "")).casefold() in ALLOWED_REASONING_LEVELS
         ]
-        if not exact_template or not levels:
-            levels = list(BUNDLED_REASONING_LEVELS.get(model_id.casefold(), levels))
-    return list(dict.fromkeys(levels)) or ["medium"]
+        if levels:
+            return list(dict.fromkeys(levels))
+    return list(BUNDLED_REASONING_LEVELS.get(model_id.casefold(), ALLOWED_REASONING_LEVELS))
 
 
 def default_reasoning(model_id: str, levels: list[str]) -> str:
