@@ -12,3 +12,8 @@ management-key
 *.log
 .venv/
 .DS_Store
+dist/
+.build/
+/cpa
+/cpa.exe
+providers.json
