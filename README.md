@@ -131,8 +131,10 @@ model_catalog_json = "/absolute/path/to/CPAModelAdapter/generated/models.json"
 当前 Codex 运行时仍需加载更新后的目录。
 
 实现参考 EasyCLIProxyAPI 的“运行时模型列表 + 精确模板 + 回退模板”思路。
-程序默认在运行时从 `router-for-me/EasyCLIProxyAPI` 下载模型模板，失败时使用已有缓存；
-首次使用需要可访问模板源，或使用 `--template-file` 提供兼容模板。
+程序默认在运行时从 `router-for-me/EasyCLIProxyAPI` 下载模型模板；
+兼容旧版单文件目录，以及新版 `model-catalog.json` 加同目录 `fallback-model.json`。
+下载失败时使用已有缓存；首次使用需要可访问模板源，
+或使用 `--template-file` 提供兼容模板（新版拆分格式需把两个文件放在同一目录）。
 本仓库不包含第三方模板内容；第三方内容的使用权限以其原项目为准。
 
 ### 元数据警告和模型菜单

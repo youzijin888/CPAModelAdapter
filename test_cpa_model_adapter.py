@@ -128,6 +128,69 @@ runpy.run_path(entrypoint, run_name="__main__")
             pathlib.Path(cpa_model_adapter.__file__).resolve().parent / "generated",
         )
 
+    def test_split_remote_template_works_without_cache(self):
+        source = {"models": [template("known-model")]}
+        fallback = template()
+        args = cpa_model_adapter.build_parser().parse_args([
+            "generate", "--template-url", "https://example.test/catalog/model-catalog.json?ref=main"
+        ])
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            cpa_model_adapter, "read_public_template", side_effect=[source, fallback]
+        ) as fetch:
+            catalog = cpa_model_adapter.fetch_template_catalog(args, pathlib.Path(directory))
+            self.assertEqual(catalog["fallback_model"], fallback)
+            self.assertEqual(
+                fetch.call_args_list,
+                [
+                    mock.call(args.template_url),
+                    mock.call("https://example.test/catalog/fallback-model.json?ref=main"),
+                ],
+            )
+            self.assertEqual(
+                json.loads((pathlib.Path(directory) / ".template-catalog-cache.json").read_text()),
+                catalog,
+            )
+
+    def test_combined_remote_template_does_not_fetch_fallback(self):
+        source = {"fallback_model": template(), "models": [template("known-model")]}
+        args = cpa_model_adapter.build_parser().parse_args(["generate"])
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            cpa_model_adapter, "read_public_template", return_value=source
+        ) as fetch:
+            self.assertEqual(
+                cpa_model_adapter.fetch_template_catalog(args, pathlib.Path(directory)), source
+            )
+            fetch.assert_called_once_with(args.template_url)
+
+    def test_split_template_file_uses_sibling_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            location = pathlib.Path(directory)
+            (location / "model-catalog.json").write_text(
+                json.dumps({"models": [template("known-model")]}), encoding="utf-8"
+            )
+            (location / "fallback-model.json").write_text(
+                json.dumps(template()), encoding="utf-8"
+            )
+            args = cpa_model_adapter.build_parser().parse_args([
+                "generate", "--template-file", str(location / "model-catalog.json")
+            ])
+            result = cpa_model_adapter.fetch_template_catalog(args, location)
+            self.assertEqual(result["fallback_model"], template())
+
+    def test_split_remote_fallback_failure_uses_valid_cache(self):
+        args = cpa_model_adapter.build_parser().parse_args(["generate"])
+        cached = {"fallback_model": template(), "models": [template("known-model")]}
+        with tempfile.TemporaryDirectory() as directory:
+            (pathlib.Path(directory) / ".template-catalog-cache.json").write_text(
+                json.dumps(cached), encoding="utf-8"
+            )
+            with mock.patch.object(cpa_model_adapter, "read_public_template", side_effect=[
+                {"models": [template("known-model")]}, OSError("offline"),
+            ]):
+                self.assertEqual(
+                    cpa_model_adapter.fetch_template_catalog(args, pathlib.Path(directory)), cached
+                )
+
     def test_extract_definitions_from_standard_models_response(self):
         definition = {"id": "example-model", "context_length": 128000}
         self.assertEqual(

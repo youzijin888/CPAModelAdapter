@@ -213,18 +213,22 @@ def fetch_template_catalog(args: argparse.Namespace, output_dir: pathlib.Path) -
     if args.template_file:
         try:
             payload = json.loads(pathlib.Path(args.template_file).read_text(encoding="utf-8"))
+            if isinstance(payload, dict) and "fallback_model" not in payload:
+                fallback_path = pathlib.Path(args.template_file).with_name("fallback-model.json")
+                payload["fallback_model"] = json.loads(fallback_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise SyncError(f"Unable to read template catalog: {exc}") from exc
         validate_template_catalog(payload)
         return payload
 
-    request = urllib.request.Request(
-        args.template_url,
-        headers={"Accept": "application/json", "User-Agent": "cpa-model-adapter/1.0"},
-    )
     try:
-        with urllib.request.urlopen(request, timeout=25) as response:
-            payload = json.load(response)
+        payload = read_public_template(args.template_url)
+        if isinstance(payload, dict) and "fallback_model" not in payload:
+            parsed = urllib.parse.urlsplit(args.template_url)
+            fallback_url = urllib.parse.urlunsplit(parsed._replace(
+                path=parsed.path.rsplit("/", 1)[0] + "/fallback-model.json"
+            ))
+            payload["fallback_model"] = read_public_template(fallback_url)
         validate_template_catalog(payload)
         atomic_write(cache_path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n", 0o600)
         return payload
@@ -237,6 +241,14 @@ def fetch_template_catalog(args: argparse.Namespace, output_dir: pathlib.Path) -
             except (OSError, json.JSONDecodeError, SyncError):
                 pass
         raise SyncError(f"Unable to obtain a valid template catalog: {exc}") from exc
+
+
+def read_public_template(url: str) -> Any:
+    request = urllib.request.Request(
+        url, headers={"Accept": "application/json", "User-Agent": "cpa-model-adapter/1.0"}
+    )
+    with urllib.request.urlopen(request, timeout=25) as response:
+        return json.load(response)
 
 
 def validate_template_catalog(payload: Any) -> None:
