@@ -67,8 +67,8 @@ func TestModernAndLegacyTemplateFormats(t *testing.T) {
 			if len(catalog.Models[0]["service_tiers"].([]any)) != 1 {
 				t.Fatal("exact model metadata lost")
 			}
-			if name == "modern" && catalog.Models[1]["context_window"] != float64(32768) {
-				t.Fatal("unknown model inherited oversized context")
+			if name == "modern" && (catalog.Models[1]["context_window"] != float64(unknownModelContextWindow) || catalog.Models[1]["max_context_window"] != float64(unknownModelContextWindow)) {
+				t.Fatal("unknown model did not use project context default")
 			}
 		})
 	}
@@ -146,6 +146,43 @@ func TestUnknownModelsWithoutThinkingGetAllCodexEfforts(t *testing.T) {
 			}
 			if str(model["default_reasoning_level"]) != "medium" {
 				t.Fatal("unknown model default effort must be medium")
+			}
+		})
+	}
+}
+
+func TestBundledFallbackContextAndProviderOverride(t *testing.T) {
+	templates, err := decodeTemplates(bundledModels)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"gpt-6-sol", "gpt-6-luna", "deepseek-flash"} {
+		t.Run(id, func(t *testing.T) {
+			catalog, _, err := buildCatalog([]map[string]any{{"slug": id}}, templates)
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := catalog.Models[0]
+			if model["context_window"] != float64(unknownModelContextWindow) || model["max_context_window"] != float64(unknownModelContextWindow) {
+				t.Fatalf("missing metadata: context=%v max=%v", model["context_window"], model["max_context_window"])
+			}
+		})
+	}
+	for _, tc := range []struct {
+		field string
+		value float64
+	}{
+		{"context_length", 128000},
+		{"context_window", 400000},
+	} {
+		t.Run(tc.field, func(t *testing.T) {
+			catalog, _, err := buildCatalog([]map[string]any{{"slug": "gpt-6-luna", tc.field: tc.value}}, templates)
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := catalog.Models[0]
+			if model["context_window"] != tc.value || model["max_context_window"] != tc.value {
+				t.Fatalf("provider context not applied: context=%v max=%v", model["context_window"], model["max_context_window"])
 			}
 		})
 	}

@@ -17,6 +17,10 @@ import (
 
 const maxJSON = 8 << 20
 
+// Project fallback for models absent from the bundled catalog and without
+// context metadata from /models. This is not a provider-guaranteed limit.
+const unknownModelContextWindow = 272000
+
 // Pinned OpenAI Codex catalog, Apache-2.0. See assets/README.md for provenance.
 // Template selection never makes an HTTP request or depends on a warm cache.
 //
@@ -169,14 +173,14 @@ func decodeTemplates(data []byte) (Templates, error) {
 	return t, validateTemplates(t)
 }
 
-// An unknown model must not inherit another model's advanced tool policies,
-// speed tiers, or enormous context window. Real /models metadata still wins.
+// An unknown model must not inherit another model's advanced tool policies or
+// speed tiers. Use the project context default until /models supplies a value.
 func conservativeFallback() map[string]any {
 	return map[string]any{
 		"display_name":      "Compatible Model",
 		"description":       "Unknown model; conservative compatibility metadata",
 		"base_instructions": "You are a coding assistant. Follow the user's instructions, inspect relevant files before editing, preserve unrelated changes, and verify your work. Use the tools provided by the client when appropriate.",
-		"context_window":    float64(32768), "max_context_window": float64(32768),
+		"context_window":    float64(unknownModelContextWindow), "max_context_window": float64(unknownModelContextWindow),
 		"supported_reasoning_levels": []any{map[string]any{"effort": "medium", "description": "medium reasoning effort"}},
 		"default_reasoning_level":    "medium", "shell_type": "default", "visibility": "list",
 		"supported_in_api": true, "default_reasoning_summary": "none", "support_verbosity": false,
@@ -332,7 +336,10 @@ func buildCatalog(defs []map[string]any, t Templates) (Catalog, int, error) {
 		}
 		if context > 0 {
 			m["context_window"] = context
-			if mx, _ := m["max_context_window"].(float64); mx < context {
+			if !exact {
+				// The generated fallback is not evidence of this model's real maximum.
+				m["max_context_window"] = context
+			} else if mx, _ := m["max_context_window"].(float64); mx < context {
 				m["max_context_window"] = context
 			}
 		}
