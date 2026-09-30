@@ -296,6 +296,16 @@ env_key = "EXISTING_CPA_KEY"
                 )
                 self.assertEqual(model["default_reasoning_level"], "medium")
 
+    def test_gpt_6_1_sol_uses_documented_reasoning_levels(self):
+        model = cpa_model_adapter.build_model_entry(
+            "gpt-6.1-sol", {}, {}, template(), 1
+        )
+        self.assertEqual(
+            [entry["effort"] for entry in model["supported_reasoning_levels"]],
+            ["low", "medium", "high", "xhigh", "max"],
+        )
+        self.assertEqual(model["default_reasoning_level"], "medium")
+
     def test_unknown_model_live_efforts_override_full_fallback(self):
         model = cpa_model_adapter.build_model_entry(
             "future-model", {"thinking": {"levels": ["low", "max"]}},
