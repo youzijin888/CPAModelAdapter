@@ -407,8 +407,8 @@ env_key = "EXISTING_CPA_KEY"
             catalog_path = pathlib.Path(directory) / "models.json"
             content = cpa_model_adapter.render_config(catalog_path)
             self.assertEqual(
-                content,
-                f'model_catalog_json = "{catalog_path.resolve()}"\n',
+                cpa_model_adapter.tomllib.loads(content),
+                {"model_catalog_json": str(catalog_path.resolve())},
             )
 
     def test_validate_generated_catalog_rejects_duplicates(self):
