@@ -44,6 +44,7 @@ ALLOWED_REASONING_LEVELS = (
 BUNDLED_REASONING_LEVELS = {
     "deepseek-flash": ALLOWED_REASONING_LEVELS,
     "gpt-6-astra": ("low", "medium", "high", "xhigh", "max"),
+    "gpt-6.1-sol": ("low", "medium", "high", "xhigh", "max"),
 }
 REASONING_DESCRIPTIONS = {
     "none": "No reasoning",

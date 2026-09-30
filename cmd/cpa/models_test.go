@@ -151,6 +151,21 @@ func TestUnknownModelsWithoutThinkingGetAllCodexEfforts(t *testing.T) {
 	}
 }
 
+func TestGPT61SolDocumentedReasoningFallback(t *testing.T) {
+	catalog, _, err := buildCatalog([]map[string]any{{"slug": "gpt-6.1-sol"}}, fixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	model := catalog.Models[0]
+	want := []string{"low", "medium", "high", "xhigh", "max"}
+	if got := efforts(model); !reflect.DeepEqual(got, want) {
+		t.Fatalf("GPT-6.1 Sol efforts = %v, want %v", got, want)
+	}
+	if got := str(model["default_reasoning_level"]); got != "medium" {
+		t.Fatalf("GPT-6.1 Sol default effort = %q, want medium", got)
+	}
+}
+
 func TestBundledFallbackContextAndProviderOverride(t *testing.T) {
 	templates, err := decodeTemplates(bundledModels)
 	if err != nil {

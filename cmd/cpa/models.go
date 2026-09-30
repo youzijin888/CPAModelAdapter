@@ -368,7 +368,7 @@ func buildCatalog(defs []map[string]any, t Templates) (Catalog, int, error) {
 		}
 		if len(levels) == 0 {
 			switch {
-			case strings.EqualFold(id, "gpt-6-astra"):
+			case strings.EqualFold(id, "gpt-6-astra"), strings.EqualFold(id, "gpt-6.1-sol"):
 				levels = []string{"low", "medium", "high", "xhigh", "max"}
 			case strings.EqualFold(id, "deepseek-flash"):
 				levels = append([]string(nil), allEfforts...)
