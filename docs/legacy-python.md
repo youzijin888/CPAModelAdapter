@@ -105,6 +105,11 @@ model_catalog_json = "/absolute/path/to/CPAModelAdapter/generated/models.json"
 4. 过滤图像、音频、嵌入等非目标模型，以及 `codex-auto-review`。
 5. 校验目录必要字段，再逐文件原子写入。
 
+上下文默认策略：未知模型统一使用 500000；精确模板中的旧 272000 默认窗口升级为
+500000，其他精确窗口值保留。供应商返回的有效 `context_length` / `context_window`
+优先；未知模型的最大窗口也跟随该返回值。这是客户端配置默认值，不保证上游支持该长度。
+Codex 全局 `model_context_window` 可覆盖默认窗口，但不能突破目录的 `max_context_window`。
+
 推理档位的优先级：CPA 响应中的有效 `thinking.levels` → 精确模型模板 →
 内置补充信息 → 通用回退模板。均缺失时才默认 `medium`。
 

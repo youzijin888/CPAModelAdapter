@@ -203,6 +203,34 @@ func TestBundledFallbackContextAndProviderOverride(t *testing.T) {
 	}
 }
 
+func TestDefaultContextMigrationAndExactTemplate(t *testing.T) {
+	for _, testcase := range []struct {
+		name        string
+		context     float64
+		maximum     float64
+		wantContext float64
+		wantMaximum float64
+	}{
+		{"legacy default", 272000, 272000, 500000, 500000},
+		{"larger maximum", 272000, 872000, 500000, 872000},
+		{"specific template", 128000, 128000, 128000, 128000},
+	} {
+		t.Run(testcase.name, func(t *testing.T) {
+			templates := fixture()
+			templates.Models[0]["context_window"] = testcase.context
+			templates.Models[0]["max_context_window"] = testcase.maximum
+			catalog, _, err := buildCatalog([]map[string]any{{"slug": "known"}}, templates)
+			if err != nil {
+				t.Fatal(err)
+			}
+			model := catalog.Models[0]
+			if model["context_window"] != testcase.wantContext || model["max_context_window"] != testcase.wantMaximum {
+				t.Fatalf("context=%v max=%v", model["context_window"], model["max_context_window"])
+			}
+		})
+	}
+}
+
 func TestReasoningPriorityAndDeepSeekCompatibility(t *testing.T) {
 	t.Run("live metadata wins", func(t *testing.T) {
 		catalog, _, err := buildCatalog([]map[string]any{{"slug": "future-model", "thinking": map[string]any{"levels": []any{"low", "max"}}}}, fixture())

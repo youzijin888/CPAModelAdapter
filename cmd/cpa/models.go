@@ -19,7 +19,8 @@ const maxJSON = 8 << 20
 
 // Project fallback for models absent from the bundled catalog and without
 // context metadata from /models. This is not a provider-guaranteed limit.
-const unknownModelContextWindow = 272000
+const unknownModelContextWindow = 500000
+const legacyDefaultContextWindow = 272000
 
 // Pinned OpenAI Codex catalog, Apache-2.0. See assets/README.md for provenance.
 // Template selection never makes an HTTP request or depends on a warm cache.
@@ -324,6 +325,12 @@ func buildCatalog(defs []map[string]any, t Templates) (Catalog, int, error) {
 		m["display_name"] = id
 		m["visibility"] = "list"
 		m["priority"] = len(c.Models) + 1
+		if context, _ := m["context_window"].(float64); !exact || context == legacyDefaultContextWindow {
+			m["context_window"] = float64(unknownModelContextWindow)
+			if maximum, _ := m["max_context_window"].(float64); !exact || maximum < unknownModelContextWindow {
+				m["max_context_window"] = float64(unknownModelContextWindow)
+			}
+		}
 		if s := str(d["display_name"]); s != "" {
 			m["display_name"] = s
 		}

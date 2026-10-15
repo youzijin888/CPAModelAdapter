@@ -24,6 +24,8 @@ except ModuleNotFoundError:
 
 
 DEFAULT_OUTPUT_DIR = str(pathlib.Path(__file__).resolve().parent / "generated")
+DEFAULT_CONTEXT_WINDOW = 500000
+LEGACY_DEFAULT_CONTEXT_WINDOW = 272000
 DEFAULT_CODEX_CONFIG = str(
     pathlib.Path(os.environ.get("CODEX_HOME") or "~/.codex").expanduser() / "config.toml"
 )
@@ -336,10 +338,22 @@ def build_model_entry(
     model["visibility"] = "list"
     model["priority"] = priority
 
-    context = definition.get("context_length") or definition.get("context_window")
-    if isinstance(context, int) and context > 0:
+    if not known or model["context_window"] == LEGACY_DEFAULT_CONTEXT_WINDOW:
+        model["context_window"] = DEFAULT_CONTEXT_WINDOW
+        model["max_context_window"] = (
+            max(model["max_context_window"], DEFAULT_CONTEXT_WINDOW)
+            if known else DEFAULT_CONTEXT_WINDOW
+        )
+
+    context = definition.get("context_length")
+    if not isinstance(context, int) or isinstance(context, bool) or context <= 0:
+        context = definition.get("context_window")
+    if isinstance(context, int) and not isinstance(context, bool) and context > 0:
         model["context_window"] = context
-        model["max_context_window"] = max(context, int(model.get("max_context_window") or context))
+        model["max_context_window"] = (
+            max(context, int(model.get("max_context_window") or context))
+            if known else context
+        )
 
     modalities = definition.get("supportedInputModalities") or definition.get("input_modalities")
     if isinstance(modalities, list):

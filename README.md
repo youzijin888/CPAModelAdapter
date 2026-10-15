@@ -173,10 +173,14 @@ wire_api = "responses"
 程序内置固定版本的 OpenAI Codex 官方模型目录，来源和校验值见 `cmd/cpa/assets/README.md`。
 兼容旧版 `fallback_model + models` 和新版仅 `models` 的模板结构；自动补齐从
 `model_messages.instructions_template` 迁移的指令字段，保留原始 `model_messages`。
-使用新版仅含 `models` 的目录时，没有精确模板的未知模型使用自有回退：当供应商 `/models` 未提供上下文长度时，
-`context_window` 和 `max_context_window` 均默认 272000；这只是项目兜底值，**不是**模型实际支持窗口的保证。
-供应商明确返回上下文长度时优先使用它；旧版目录中显式提供的 `fallback_model` 仍按其配置生效。
+当供应商 `/models` 未提供上下文长度时，未知模型的 `context_window` 和 `max_context_window`
+均默认 500000；精确模板中的旧 272000 默认窗口也升级为 500000，并保证最大窗口不小于默认窗口。
+精确模板中的其他窗口值保持不变，供应商明确返回的上下文长度优先使用。
+这只是项目默认值，**不是**模型实际支持窗口的保证；旧版 `fallback_model` 的其他元数据仍保留。
 未知模型不继承其他模型的高级工具策略。
+
+Codex 的全局 `model_context_window` 会覆盖目录默认窗口，但仍受目录中的
+`max_context_window` 限制；它不是无条件放大上游容量的开关。
 
 推理档位按以下优先级生成：供应商 `/models` 返回的有效 `thinking.levels`、精确模型模板、
 特定模型补充、Codex 完整档位 `none / minimal / low / medium / high / xhigh / max / ultra`。
