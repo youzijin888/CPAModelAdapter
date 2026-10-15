@@ -296,6 +296,33 @@ env_key = "EXISTING_CPA_KEY"
                 )
                 self.assertEqual(model["default_reasoning_level"], "medium")
 
+    def test_context_defaults_and_provider_priority(self):
+        for name, known, template_context, definition, want_context, want_max in (
+            ("unknown", False, 128000, {}, 500000, 500000),
+            ("old default", True, 272000, {}, 500000, 500000),
+            ("specific template", True, 128000, {}, 128000, 128000),
+            ("smaller provider", False, 128000, {"context_length": 64000}, 64000, 64000),
+            ("larger provider", False, 128000, {"context_window": 1000000}, 1000000, 1000000),
+            ("invalid primary", False, 128000, {"context_length": -1, "context_window": 64000}, 64000, 64000),
+        ):
+            with self.subTest(name=name):
+                base = template("example")
+                base["context_window"] = template_context
+                base["max_context_window"] = template_context
+                model = cpa_model_adapter.build_model_entry(
+                    "example", definition, {"example": base} if known else {}, base, 1
+                )
+                self.assertEqual(model["context_window"], want_context)
+                self.assertEqual(model["max_context_window"], want_max)
+
+    def test_old_default_preserves_larger_template_maximum(self):
+        base = template("example")
+        base["context_window"] = 272000
+        base["max_context_window"] = 872000
+        model = cpa_model_adapter.build_model_entry("example", {}, {"example": base}, base, 1)
+        self.assertEqual(model["context_window"], 500000)
+        self.assertEqual(model["max_context_window"], 872000)
+
     def test_gpt_6_1_sol_uses_documented_reasoning_levels(self):
         model = cpa_model_adapter.build_model_entry(
             "gpt-6.1-sol", {}, {}, template(), 1
